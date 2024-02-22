@@ -25,13 +25,17 @@ int main()
     }
     for (int i = 0; i < 4; ++i)
     {
-        
+
         for (int j = 0; j < 4; ++j)
         {
-            
+
+            if (j % 3 == 0)
+            {
+                std::cout << gameboard[i][j] << endl;
+            }
             std::cout << gameboard[i][j] << " ";
         }
-        
+
         std::cout << std::endl;
     }
     return 0;
