@@ -14,7 +14,7 @@ int main()
             char curr = input[num];
             if (curr == '#')
             {
-                gameboard[i][j] = ' ';
+                gameboard[i][j] = '#';
             }
             else
             {
