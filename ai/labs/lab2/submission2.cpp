@@ -10,7 +10,7 @@ string boardOutput(string board){
             cout<<"_ ";
         }else if(board[i]=="x"){
             cout<<"x ";
-        }else if(board[i]=="o "){
+        }else if(board[i]=="o"){
             cout<<"o ";
         }
 }
