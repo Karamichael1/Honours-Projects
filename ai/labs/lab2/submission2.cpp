@@ -6,11 +6,11 @@ string boardOutput(string board){
         if(i%3==2){
             cout<<endl;
         }
-        if(board[i]=="."){
+        if(board[i]=='.'){
             cout<<"_ ";
-        }else if(board[i]=="x"){
+        }else if(board[i]=='x'){
             cout<<"x ";
-        }else if(board[i]=="o"){
+        }else if(board[i]=='o'){
             cout<<"o ";
         }
 }
