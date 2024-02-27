@@ -3,9 +3,6 @@ using namespace std;
 
 string boardOutput(string board){
     for(int i=0;i<9;i++){
-        if(i%3==2){
-            cout<<endl;
-        }
         if(board[i]=='.'){
             cout<<"_ ";
         }else if(board[i]=='x'){
@@ -13,10 +10,15 @@ string boardOutput(string board){
         }else if(board[i]=='o'){
             cout<<"o ";
         }
+        if(i%3==2){
+            cout<<endl;
+        }
+        
 }
+return "";
 }
 int main(){
     string board="";
-    cin>>board>>endl;
-    string final=boardOutput(board);
+    cin>>board;
+    boardOutput(board);
 }
