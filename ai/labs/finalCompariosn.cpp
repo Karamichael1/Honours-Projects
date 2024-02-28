@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <cmath>
+#include <fstream>
 using namespace std;
 
 bool isGoalState(const string &state)
@@ -209,16 +210,50 @@ int aStarSearch2(const string &initialState)
 
 int main()
 {
-    string initialState;
-    cin >> initialState;
-    int solution = aStarSearch(initialState);
-    int b = bfs(initialState);
-    int a1 = aStarSearch1(initialState);
-    int a2 = aStarSearch2(initialState);
-    cout << solution << endl;
-    cout << b << endl;
-    cout << a1 << endl;
-    cout << a2 << endl;
+    // Open the input file stream to read initial states
+    // ifstream inFile("puzzles.txt");
+    // if (!inFile.is_open()) {
+    //     cout << "Unable to open input file." << endl;
+    //     return 1;
+    // }
+
+    // // Open the output file stream for writing answers
+    // ofstream outFile("output.txt");
+    // if (!outFile.is_open()) {
+    //     cout << "Unable to open output file." << endl;
+    //     inFile.close(); // Close the input file stream
+    //     return 1;
+    // }
+
+    // // Write the table header to the output file
+    // outFile << "Initial State\tSolution\tb\tA1\tA2\n";
+
+    // string initialState;
+    // // Read each initial state from the input file
+    // while (getline(inFile, initialState))
+    // {
+        string initialState;
+        cin>>initialState;
+        int solution = aStarSearch(initialState);
+        // int b = bfs(initialState);
+        int a1 = aStarSearch1(initialState);
+        int a2 = aStarSearch2(initialState);
+
+        // Write the values for each state to the output file
+        // outFile << initialState << "\t" << solution << "\t" << b << "\t" << a1 << "\t" << a2 << "\n";
+
+        cout << solution<<" "<<a1<<" "<<a2;
+        // if (inFile.fail()) {
+        //     cout << "Error reading input file." << endl;
+        //     break;
+        // }
+    // }
+
+    // Close the file streams
+    // inFile.close();
+    // outFile.close();
+
+    // cout << "Answers written to output.txt successfully." << endl;
 
     return 0;
 }
