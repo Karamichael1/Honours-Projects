@@ -70,7 +70,7 @@ for epoch in range(epochs):
     
    
     a1, a2 = forward_prop(X_train, W1, W2, b1, b2)
-    error = np.mean(np.abs(a2 - y_train))
+    error = np.mean(np.abs(a2 - y_train)**2)
     print(f"Epoch {epoch+1}/{epochs}, Error: {error:.4f}")
 
 
