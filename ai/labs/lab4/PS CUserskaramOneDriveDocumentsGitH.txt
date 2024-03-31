@@ -1,0 +1,13 @@
+PS C:\Users\karam\OneDrive\Documents\GitHub\Honours-Projects> python -u "c:\Users\karam\OneDrive\Documents\GitHub\Honours-Projects\ai\labs\lab4\sub4.py"
+You shall be king
+Probabilities:
+Hamlet: 51%
+King Lear: 18%
+The Tempest: 11%
+Macbeth: 11%
+Midsummer Night's Dream: 3%
+The Merchant of Venice: 2%
+Twelfth Night: 2%
+Romeo and Juliet: 1%
+Much Ado About Nothing: 1%
+Othello: 0%
