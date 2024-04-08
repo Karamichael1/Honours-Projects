@@ -12,7 +12,7 @@ def get_bow(filename):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(script_dir, filename)
         with open(file_path, 'r', encoding='utf-8') as file:
-            file.readline()  # Skip the heading line
+            file.readline() 
             text = file.read()
         word_counts = Counter(clean_words(text))
         total_words = sum(word_counts.values())
