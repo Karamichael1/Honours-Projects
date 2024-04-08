@@ -31,6 +31,6 @@ result = forward_algorithm(observations)
 
 for t in range(len(observations)+3):
     if t == 0:
-        print(f"Timestep {t}: 0.500")
+        print(f"Timestep {t}: 0.5")
     else:
         print(f"Timestep {t}: {result[t, 0]:.3f}")
