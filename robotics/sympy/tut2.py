@@ -91,6 +91,11 @@ jv2Minus=sym.Matrix([
     [a1*sin(theta1)],
     [d1]
 ])
+jv3=sym.Matrix([
+    [0],
+    [0],
+    [0]
+])
 jv1=id.cross(jv)
 sym.pprint(jv1)
 jv2=id.cross(jv1-jv2Minus)
