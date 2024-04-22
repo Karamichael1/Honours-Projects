@@ -1,109 +1,63 @@
 import pandas as pd
-import numpy as np
-from pgmpy.models import BayesianNetwork
-from pgmpy.estimators import MmhcEstimator, BayesianEstimator
+from pgmpy.estimators import HillClimbSearch,BayesianEstimator,BicScore
+from pgmpy.models import BayesianModel,BayesianNetwork
 from pgmpy.inference import VariableElimination
-from sklearn.preprocessing import MinMaxScaler, KBinsDiscretizer
-from sklearn.model_selection import StratifiedKFold
-import os
-print("Current working directory:", os.getcwd())
-# Load and combine all Excel files into a single DataFrame
-# Load and combine all Excel files into a single DataFrame
-data = pd.DataFrame()
-file_names = ['C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Aloe Ridge 1 - 20180102 - 20240422.xlsx',
-              'C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Aloe Ridge 1 - 20060101 - 20080101.xlsx',
-              'C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Aloe Ridge 1 - 20080101 - 20180101.xlsx',
-              'C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Aloe Ridge 2 - 20080101 - 20150101.xlsx',
-              'C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Aloe Ridge 2 - 20150102 - 20240422.xlsx',
-              'C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Greenstone Crest - 20150101 - 20150930.xlsx',
-              'C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Greenstone Crest - 20151001 - 20160601.xlsx',
-              'C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Greenstone Crest - 20160601 - 20161231.xlsx',
-              'C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Greenstone Crest - 20170101 - 20200331.xlsx',
-              'C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Greenstone Crest - 20200401 - 20240422.xlsx',
-              'C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Greenstone Ridge 1.xlsx',
-              'C:/Users/User/Documents/GitHub/Honours-Projects/PGM/Transfer rep - Greenstone Ridge 2.xlsx']
+from ucimlrepo import fetch_ucirepo
+import matplotlib.pyplot as plt
+import networkx as nx
+from daft import PGM
+import daft
 
-for file in file_names:
-    data = pd.concat([data, pd.read_excel(file)], ignore_index=True)
-# Data Preprocessing
-# Handle missing values
-data.fillna(method='ffill', inplace=True)
-data.fillna(method='bfill', inplace=True)
+def plot_structure(DAG):
+        # Create a NetworkX graph from the DAG
+        G = nx.DiGraph()
+        G.add_nodes_from(DAG.nodes)
+        G.add_edges_from(DAG.edges)
 
-# Normalize numerical features using Min-Max scaling
-scaler = MinMaxScaler()
-numerical_cols = ['Sales price', 'Size']
-data[numerical_cols] = scaler.fit_transform(data[numerical_cols])
+        # Use Graphviz dot layout
+        pos = nx.drawing.layout.planar_layout(G)
 
-# Discretize numerical features using KBinsDiscretizer
-discretizer = KBinsDiscretizer(n_bins=5, encode='ordinal', strategy='quantile')
-data[numerical_cols] = discretizer.fit_transform(data[numerical_cols])
+        # Create the plot
+        plt.figure(figsize=(10, 8))
+        nx.draw(G, pos, with_labels=True, node_size=500, arrowsize=20)
+        plt.show()
+# fetch dataset 
+adult = fetch_ucirepo(id=2) 
+# data (as pandas dataframes) 
+X = adult.data.features 
+y = adult.data.targets 
 
-# Create an ensemble of Bayesian networks using bagging and cross-validation
-n_estimators = 10
-n_splits = 5
-ensemble_models = []
-kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
 
-for train_index, test_index in kf.split(data, data['Sales price']):
-    train_data = data.iloc[train_index]
-    test_data = data.iloc[test_index]
-    for _ in range(n_estimators):
-        # Generate bootstrap samples
-        bootstrap_indices = np.random.choice(len(train_data), size=len(train_data), replace=True)
-        bootstrap_data = train_data.iloc[bootstrap_indices]
+# Discretize the features using quantile-based discretization
+num_bins = 5  # Number of bins for discretization
+discretize_vars = ['hours-per-week', 'capital-loss', 'capital-gain', 'age', 'fnlwgt', 'education-num']
+X_discretized = X.copy()
+for col in discretize_vars:
+    X_discretized[col] = pd.cut(X[col], 5, labels=False)
+data = pd.concat([X_discretized, y], axis=1)
+data['income'] = data['income'].str.strip('.')
+# Learn Bayesian network structure using Hill Climb Search
+est = HillClimbSearch(data)
+best_model = est.estimate(scoring_method=BicScore(data))
+# Print learned Bayesian network structure
+print("Learned Bayesian network structure:")
+BayesNet=BayesianNetwork(best_model.edges())
+# Create CPTs for the Bayesian network
+BayesNet.fit(data)
+print(best_model.nodes())
+# Print CPTs
+print("\nConditional Probability Tables (CPTs):")
+#for cpd in BayesNet.get_cpds():
+    #print(cpd)
 
-        # Perform structured learning using MmhcEstimator
-        estimator = MmhcEstimator(bootstrap_data)
-        model = estimator.estimate()
+# Perform exact inference using variable elimination
+inference = VariableElimination(BayesNet)
 
-        # Print the learned Bayesian network structure
-        print(f"Learned Bayesian Network structure: {model.edges()}")
+# Example evidence (replace with your desired feature values)
+evidence = {'age': 1}
 
-        # Estimate the parameters of the Bayesian network using Bayesian estimation
-        estimator = BayesianEstimator(model, bootstrap_data)
-        model.fit(bootstrap_data, estimator=estimator)
-        ensemble_models.append(model)
-
-# Inference function to estimate sales price
-def estimate_sales_price(township, erf, suburb, street_number, sales_date, seller_name, size, r_m2=None):
-    evidence = {
-        'Township': township,
-        'Erf': erf,
-        'Suburb': suburb,
-        'Street Number': street_number,
-        'Sales Date': sales_date,
-        'Seller Name': seller_name,
-        'Size': size
-    }
-
-    # Discretize input variables
-    size_discretized = discretizer.transform([[size]])[0][0]
-
-    # Perform inference using each model in the ensemble
-    price_probabilities_ensemble = []
-    for model in ensemble_models:
-        inference = VariableElimination(model)
-        query = inference.query(variables=['Sales price'], evidence=evidence)
-        price_probabilities_ensemble.append(query['Sales price'].values)
-
-    # Average the price probabilities from all models
-    price_probabilities_mean = np.mean(price_probabilities_ensemble, axis=0)
-
-    # Calculate the expected sales price
-    expected_sales_price = np.sum(price_probabilities_mean * discretizer.bin_edges_[0])
-
-    return expected_sales_price
-
-# Example usage
-township = 'GREENSTONE HILL EXT 20'
-erf = 1834
-suburb = 'GREENSTONE HILL'
-street_number = 41
-sales_date = '2015/02/03'
-seller_name = 'PRIVATE PERSON'
-size = 300
-r_m2 = None  # If not provided, it will be estimated from the data
-
-estimated_price = estimate_sales_price(township, erf, suburb, street_number, sales_date, seller_name, size, r_m2)
-print(f"Estimated Sales Price: {estimated_price:.2f}")
+# Perform inference on the 'target' variable given the evidence
+query = inference.query(['income'], evidence=evidence)
+print("\nInference result:")
+print(query)
+plot_structure(best_model)
