@@ -12,7 +12,6 @@ def make_move(fen_string, move_string):
     board.push(move)
     return board.fen()
 
-
 # function used to generate all the possible legal moves given a board state
 def generate_next_moves(fen_string):
 
@@ -40,6 +39,25 @@ def generate_next_moves(fen_string):
     # return the moves sorte alphabetically
     return sorted(moves)
 
+def generate_next_moves_capture(fen_string, capture_square):
+    # use chess library to create board
+    board = chess.Board(fen_string)
+    
+    # convert the capture_square to a chess.Square object
+    target_square = chess.parse_square(capture_square)
+    
+    # define an empty list to store capture moves
+    capture_moves = []
+    
+    # iterate over all legal moves
+    for move in board.legal_moves:
+        # check if the move captures on the target_square
+        if move.to_square == target_square and board.is_capture(move):
+            uci = move.uci() 
+            capture_moves.append(uci)
+    
+    return sorted(capture_moves)
+
 # generate the next fen stirngs
 def generate_next_positions(fen_string, possible_moves):
 
@@ -53,33 +71,13 @@ def generate_next_positions(fen_string, possible_moves):
 
 if __name__ == "__main__":
     fen_string = input()
+    capture_square = input()
 
-    possible_moves = generate_next_moves(fen_string)
-        
-    fen_results = generate_next_positions(fen_string,possible_moves)
+    capture_moves = generate_next_moves_capture(fen_string, capture_square)
+    
+    fen_results = generate_next_positions(fen_string, capture_moves)
     
     for fen_string in fen_results:
         print(fen_string)
-
-def generate_next_positionss(fen):
-    board = chess.Board(fen)
-    positions = []
-
-    for move in board.generate_pseudo_legal_moves():
-        board.push(move)
-        positions.append(board.fen())
-        board.pop()
-
-   
-    for move in utilities.without_opponent_pieces(board).generate_castling_moves():
-        if not utilities.is_illegal_castle(board, move):
-            board.push(move)
-            positions.append(board.fen())
-            board.pop()
-
-    
-    board.push(chess.Move.null())
-    positions.append(board.fen())
-    board.pop()
-
-    return sorted(positions)
+        
+        
