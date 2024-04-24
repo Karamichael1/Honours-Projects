@@ -69,39 +69,37 @@ def generate_next_positions(fen_string, possible_moves):
 
     return sorted(fen_possibilites)
 
-# function used to comparte a stae to a window
 def compare_state_window(fen_states, window):
-
     fen_results = []
     for fen_string in fen_states:
         # Parse the FEN string into a chess board
         board = chess.Board(fen_string)
-        continuing  = False
+        
         # Convert the window string to a 2D list
-
         window_list = [row.split(":") for row in window.split(";")]
-        # print(window_list)
+        
         # Compare each square in the window with the corresponding square on the board
+        match = True
         for item in window_list:
             window_pos = item[0]
             window_piece = item[1]
             board_square = chess.parse_square(window_pos)
             board_piece = board.piece_at(board_square)
-
-            empty_space = not (window_piece == "?" and board_piece is None)
-            white_piece = not (window_piece != "?" and board_piece.color  == chess.WHITE and board_piece.symbol().upper() == window_piece)
-            black_piece = not (window_piece != "?" and board_piece.color  == chess.BLACK and board_piece.symbol().lower() == window_piece)
             
-            
-            if empty_space and white_piece and black_piece:
-                continuing = True
-                break
+            if window_piece == "?":
+                if board_piece is not None:
+                    match = False
+                    break
+            else:
+                if board_piece is None or \
+                   (board_piece.color == chess.WHITE and board_piece.symbol().upper() != window_piece) or \
+                   (board_piece.color == chess.BLACK and board_piece.symbol().lower() != window_piece):
+                    match = False
+                    break
         
-        if continuing:
-            continue
-            
-        fen_results.append(fen_string)
-        
+        if match:
+            fen_results.append(fen_string)
+    
     return sorted(fen_results)
 
 if __name__ == "__main__":
