@@ -39,6 +39,7 @@ def generate_next_moves(fen_string):
     # return the moves sorte alphabetically
     return sorted(moves)
 
+# function used to dectect the possible captures
 def generate_next_moves_capture(fen_string, capture_square):
     # use chess library to create board
     board = chess.Board(fen_string)
@@ -68,16 +69,61 @@ def generate_next_positions(fen_string, possible_moves):
 
     return sorted(fen_possibilites)
 
+# function used to comparte a stae to a window
+def compare_state_window(fen_states, window):
+
+    fen_results = []
+    for fen_string in fen_states:
+        # Parse the FEN string into a chess board
+        board = chess.Board(fen_string)
+        continuing  = False
+        # Convert the window string to a 2D list
+
+        window_list = [row.split(":") for row in window.split(";")]
+        # print(window_list)
+        # Compare each square in the window with the corresponding square on the board
+        for item in window_list:
+            window_pos = item[0]
+            window_piece = item[1]
+            board_square = chess.parse_square(window_pos)
+            board_piece = board.piece_at(board_square)
+
+            empty_space = not (window_piece == "?" and board_piece is None)
+            white_piece = not (window_piece != "?" and board_piece.color  == chess.WHITE and board_piece.symbol().upper() == window_piece)
+            black_piece = not (window_piece != "?" and board_piece.color  == chess.BLACK and board_piece.symbol().lower() == window_piece)
+            
+            
+            if empty_space and white_piece and black_piece:
+                continuing = True
+                break
+        
+        if continuing:
+            continue
+            
+        fen_results.append(fen_string)
+        
+    return sorted(fen_results)
 
 if __name__ == "__main__":
-    fen_string = input()
-    capture_square = input()
 
-    capture_moves = generate_next_moves_capture(fen_string, capture_square)
-    
-    fen_results = generate_next_positions(fen_string, capture_moves)
-    
+    num_states = int(input())
+
+    fen_possible_states = []
+    for _ in range(num_states):
+        fen = input()
+        fen_possible_states.append(fen)
+
+    sensing_window = input()
+
+
+    fen_results = compare_state_window(fen_possible_states, sensing_window)
     for fen_string in fen_results:
         print(fen_string)
+
+   
         
-        
+# 3
+# 1k6/1ppn4/8/8/8/1P1P4/PN3P2/2K5 w - - 0 32
+# 1k6/1ppnP3/8/8/8/1P1P4/PN3P2/2K5 w - - 0 32
+# 1k6/1ppn1p2/8/8/8/1P1P4/PN3P2/2K5 w - - 0 32
+# c8:?;d8:?;e8:?;c7:p;d7:n;e7:?;c6:?;d6:?;e6:?
