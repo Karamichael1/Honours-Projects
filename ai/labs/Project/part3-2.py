@@ -34,6 +34,7 @@ for _ in range(N):
             if move.to_square == king_square:
                 moves.append(move.uci())
                 break
+
     else:
         # Get the best move from Stockfish with a time limit of 0.5 seconds
         result = engine.play(board, chess.engine.Limit(time=0.5,depth=10))
