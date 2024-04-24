@@ -1,32 +1,24 @@
 import chess
+from reconchess import utilities
 
 def generate_next_moves(fen):
     board = chess.Board(fen)
     moves = []
+
+    
     for move in board.generate_pseudo_legal_moves():
         uci = move.uci()
         moves.append(uci)
 
-    if board.has_kingside_castling_rights(chess.WHITE):
-        castling_move = 'e1g1'
-        if castling_move not in moves:
-            moves.append(castling_move)
-    if board.has_kingside_castling_rights(chess.BLACK):
-        castling_move = 'e8g8'
-        if castling_move not in moves:
-            moves.append(castling_move)
-
     
-    if board.has_queenside_castling_rights(chess.WHITE):
-        castling_move = 'e1c1'
-        if castling_move not in moves:
-            moves.append(castling_move)
-    if board.has_queenside_castling_rights(chess.BLACK):
-        castling_move = 'e8c8'
-        if castling_move not in moves:
-            moves.append(castling_move)
+    for move in utilities.without_opponent_pieces(board).generate_castling_moves():
+        if not utilities.is_illegal_castle(board, move):
+            uci = move.uci()
+            if uci not in moves:
+                moves.append(uci)
 
-    moves.append('0000')
+    moves.append("0000")
+
     return sorted(moves)
 
 if __name__ == "__main__":
