@@ -3,7 +3,6 @@ import chess.engine
 from collections import Counter
 
 
-
 # Load the Stockfish engine
 engine = chess.engine.SimpleEngine.popen_uci('/opt/stockfish/stockfish', setpgrp=True)
 

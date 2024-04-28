@@ -12,7 +12,6 @@ def make_move(fen_string, move_string):
     board.push(move)
     return board.fen()
 
-
 # function used to generate all the possible legal moves given a board state
 def generate_next_moves(fen_string):
 
@@ -60,26 +59,3 @@ if __name__ == "__main__":
     
     for fen_string in fen_results:
         print(fen_string)
-
-def generate_next_positionss(fen):
-    board = chess.Board(fen)
-    positions = []
-
-    for move in board.generate_pseudo_legal_moves():
-        board.push(move)
-        positions.append(board.fen())
-        board.pop()
-
-   
-    for move in utilities.without_opponent_pieces(board).generate_castling_moves():
-        if not utilities.is_illegal_castle(board, move):
-            board.push(move)
-            positions.append(board.fen())
-            board.pop()
-
-    
-    board.push(chess.Move.null())
-    positions.append(board.fen())
-    board.pop()
-
-    return sorted(positions)
