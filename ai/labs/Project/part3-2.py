@@ -1,5 +1,5 @@
-import chess
-import chess.engine
+import chess  # type: ignore 
+import chess.engine # type: ignore
 from collections import Counter
 
 
