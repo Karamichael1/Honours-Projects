@@ -4,7 +4,7 @@ from collections import Counter
 
 
 # Load the Stockfish engine
-engine = chess.engine.SimpleEngine.popen_uci('/opt/stockfish/stockfish', setpgrp=True)
+engine = chess.engine.SimpleEngine.popen_uci('stockfish/stockfish', setpgrp=True)
 
 # Read the number of boards
 N = int(input())
