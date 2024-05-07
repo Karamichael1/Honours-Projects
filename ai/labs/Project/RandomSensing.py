@@ -24,16 +24,16 @@ class RandomSensingAgent(Player):
                 self.possible_states = {fen for fen in self.possible_states if chess.Board(fen).piece_at(capture_square) is None}
 
     def choose_sense(self, sense_actions: List[Square], move_actions: List[chess.Move], seconds_left: float) -> Optional[Square]:
-        # Define the center squares
+        
         center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
         
-        # Filter valid sense actions that are in the center squares
+        
         valid_center_squares = [square for square in sense_actions if square in center_squares]
         
         if valid_center_squares:
             return random.choice(valid_center_squares)
         else:
-            # If no center squares are available, choose randomly from valid sense actions
+        
             return random.choice(sense_actions)
 
     def handle_sense_result(self, sense_result: List[Tuple[Square, Optional[chess.Piece]]]):
@@ -138,8 +138,8 @@ def compare_state_window(fen_states, sense_result):
                     break
             else:
                 if board_piece is None or \
-                   (board_piece.color == chess.WHITE and board_piece.symbol().upper() != piece.symbol().upper()) or \
-                   (board_piece.color == chess.BLACK and board_piece.symbol().lower() != piece.symbol().lower()):
+                    (board_piece.color == chess.WHITE and board_piece.symbol().upper() != piece.symbol().upper()) or \
+                    (board_piece.color == chess.BLACK and board_piece.symbol().lower() != piece.symbol().lower()):
                     match = False
                     break
         
