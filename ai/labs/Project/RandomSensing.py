@@ -8,7 +8,7 @@ class RandomSensingAgent(Player):
         self.board = None
         self.color = None
         self.possible_states = set()
-        self.engine = chess.engine.SimpleEngine.popen_uci('/opt/stockfish/stockfish', setpgrp=True)
+        self.engine = chess.engine.SimpleEngine.popen_uci('stockfish/stockfish', setpgrp=True)
 
     def handle_game_start(self, color: Color, board: chess.Board, opponent_name: str):
         self.board = board
