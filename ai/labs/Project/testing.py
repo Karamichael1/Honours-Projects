@@ -6,7 +6,10 @@ from ImprovedAgent import ImprovedAgent
 
 
 import sys
+import os
 
+# Set the STOCKFISH_EXECUTABLE environment variable
+os.environ["STOCKFISH_EXECUTABLE"] = "C:\\Users\\karam\\OneDrive\\Documents\\GitHub\\Honours-Projects\\ai\\labs\\Project\\stockfish\\stockfish.exe"
 if len(sys.argv) == 3:
     num_rounds = int(sys.argv[1])
     game_length = float(sys.argv[2])
