@@ -18,6 +18,10 @@ class RandomSensingAgent(Player):
         self.possible_states = {board.fen()}
 
     def handle_opponent_move_result(self, captured_my_piece: bool, capture_square: Optional[Square]):
+        if self.color == chess.WHITE and self.board.fullmove_number == 1:
+            # If playing as white and it's the first move, no need to update possible states
+            return
+
         # Update the possible states based on the opponent's move result
         if captured_my_piece:
             if capture_square is not None:

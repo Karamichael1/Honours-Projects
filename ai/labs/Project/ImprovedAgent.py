@@ -2,167 +2,201 @@ import chess
 import chess.engine
 import random
 from reconchess import *
-from collections import Counter
+from collections import defaultdict
 import numpy as np
+from typing import List, Tuple, Optional
 
+from dataclasses import dataclass
+
+@dataclass
+class SenseConfig:
+    boards_per_centipawn: float = 50
+    expected_outcome_coef: float = 1.0
+    worst_outcome_coef: float = 0.2
+    outcome_variance_coef: float = -0.3
+    score_variance_coef: float = 0.15
+
+@dataclass
+class MoveConfig:
+    mean_score_factor: float = 0.7
+    min_score_factor: float = 0.3
+    max_score_factor: float = 0.0
+    threshold_score: float = 10
+    sense_by_move: bool = False
+    force_promotion_queen: bool = True
+    sampling_exploration_coef: float = 1_000.0
+    move_sample_rep_limit: int = 100
+
+@dataclass
+class ScoreConfig:
+    search_depth: int = 5
+    capture_king_score: int = 1_000_000
+    into_check_score: int = -1_000_000
+    capture_score: int = 500_000
+    hanging_material_penalty_ratio: float = 0.1
+    rook_bonus: int = 5  # Bonus for rook presence on the board
+    reward_attacker: int = 2
+
+@dataclass
+class TimeConfig:
+    turns_to_plan_for: int = 16
+    min_time_for_turn: float = 3.0
+    max_time_for_turn: float = 40.0
+    time_for_sense: float = 0.7
+    time_for_move: float = 0.3
+    calc_time_per_move: float = 0.005
 class ImprovedAgent(Player):
     def __init__(self):
         self.board = None
         self.color = None
         self.possible_states = set()
         self.engine = chess.engine.SimpleEngine.popen_uci('stockfish/stockfish', setpgrp=True)
-        self.opponent_moves = []
-        self.sensing_heatmap = {square: 0 for square in chess.SQUARES}
-        self.move_history = []
-        self.sensing_history = []
+        self.score_cache = dict()
+        self.boards_in_cache = set()
+        self.board_sample_priority = defaultdict(set)
+        self.sense_config = SenseConfig()
+        self.move_config = MoveConfig()
+        self.score_config = ScoreConfig()
+        self.time_config = TimeConfig()
 
     def handle_game_start(self, color: Color, board: chess.Board, opponent_name: str):
-        # Initialize the agent's state at the start of the game
         self.board = board
         self.color = color
         self.possible_states = {board.fen()}
 
     def handle_opponent_move_result(self, captured_my_piece: bool, capture_square: Optional[Square]):
-        # Update the possible states based on the opponent's move result
+        if self.color == chess.WHITE and self.board.fullmove_number == 1:
+            # If playing as white and it's the first move, no need to update possible states
+            return
+
         if captured_my_piece:
-            if capture_square is not None:
-                self.possible_states = {fen for fen in self.possible_states if chess.Board(fen).piece_at(capture_square) is not None}
+            # Opponent captured one of our pieces
+            self.possible_states = {
+                fen for fen in self.possible_states
+                if any(chess.Board(fen).piece_at(sq) is None for sq in chess.SQUARES if self.board.piece_at(sq) is not None)
+            }
         else:
-            if capture_square is not None:
-                self.possible_states = {fen for fen in self.possible_states if chess.Board(fen).piece_at(capture_square) is None}
+            # Opponent did not capture any of our pieces
+            self.possible_states = {
+                fen for fen in self.possible_states
+                if all(chess.Board(fen).piece_at(sq) == self.board.piece_at(sq) for sq in chess.SQUARES if self.board.piece_at(sq) is not None)
+            }
 
     def choose_sense(self, sense_actions: List[Square], move_actions: List[chess.Move], seconds_left: float) -> Optional[Square]:
-        # Prioritize sensing squares that reduce the uncertainty of the game state
-        uncertain_squares = self.get_uncertain_squares()
-        if uncertain_squares:
-            return self.select_sensing_square(uncertain_squares, move_actions, seconds_left)
+        if len(self.possible_states) == 1:
+            return None
+
+        if seconds_left < 10:
+            return self.sense_min_states(sense_actions, move_actions, seconds_left)
         else:
-            return self.sense_center_squares(sense_actions)
+            return self.sense_max_outcome(sense_actions, move_actions, seconds_left)
 
-    def get_uncertain_squares(self) -> List[Square]:
-        # Identify squares where the piece occupancy is uncertain based on the possible states
-        uncertain_squares = []
-        for square in chess.SQUARES:
-            piece_counts = Counter(board.piece_at(square) for board in [chess.Board(fen) for fen in self.possible_states])
-            if len(piece_counts) > 1:
-                uncertain_squares.append(square)
-        return uncertain_squares
+    def sense_min_states(self, sense_actions: List[Square], move_actions: List[chess.Move], seconds_left: float) -> Optional[Square]:
+        sample_size = min(len(self.possible_states), 2500)
+        board_sample = random.sample(self.possible_states, sample_size)
 
-    def select_sensing_square(self, uncertain_squares: List[Square], move_actions: List[chess.Move], seconds_left: float) -> Optional[Square]:
-        # Select the sensing square that provides the most valuable information
-        max_info_gain = -float('inf')
-        best_square = None
-        for square in uncertain_squares:
-            info_gain = self.calculate_information_gain(square, move_actions, seconds_left)
-            if info_gain > max_info_gain:
-                max_info_gain = info_gain
-                best_square = square
-        return best_square
+        num_occurances = defaultdict(lambda: defaultdict(float))
+        sense_results = defaultdict(lambda: defaultdict(set))
+        for board_fen in board_sample:
+            board = chess.Board(board_fen)
+            for square in sense_actions:
+                sense_result = sense_masked_bitboards(board, square)
+                num_occurances[square][sense_result] += 1
+                sense_results[square][board_fen] = sense_result
 
-    def calculate_information_gain(self, square: Square, move_actions: List[chess.Move], seconds_left: float) -> float:
-        # Calculate the potential information gain of sensing a specific square
-        info_gain = 0
-        for move in move_actions:
-            if move.to_square == square or move.from_square == square:
-                info_gain += 1
+        expected_set_reduction = {
+            square:
+                len(self.possible_states) *
+                (1 - (1 / len(board_sample) ** 2) *
+                 sum([num_occurances[square][sense_result] ** 2 for sense_result in sense_results[square].values()]))
+            for square in sense_actions
+        }
 
-        # Incorporate opponent move patterns
-        opponent_move_weight = 1 + len(self.opponent_moves) / 10  # Adjust this value as needed
-        for opponent_move in self.opponent_moves:
-            if opponent_move.to_square == square or opponent_move.from_square == square:
-                info_gain *= opponent_move_weight
+        max_sense_score = max(expected_set_reduction.values())
+        sense_choice = random.choice(
+            [square for square, score in expected_set_reduction.items() if abs(score - max_sense_score) < 1e-5]
+        )
+        return sense_choice
 
-        # Incorporate remaining time
-        time_weight = 1 + (seconds_left / 60)  # Adjust this value as needed
-        info_gain *= time_weight
+    def sense_max_outcome(self, sense_actions: List[Square], move_actions: List[chess.Move], seconds_left: float) -> Optional[Square]:
+        sample_size = min(len(self.possible_states), 2500)
+        board_sample = random.sample(self.possible_states, sample_size)
 
-        return info_gain
+        sense_scores = {}
+        for square in sense_actions:
+            sense_result = sense_masked_bitboards(board_sample, square)
+            outcome_scores = []
+            for sense_result_board in sense_result:
+                op_score = self.score_cache.get(sense_result_board, None)
+                if op_score is None:
+                    op_score = self.evaluate_board(sense_result_board)
+                    self.score_cache[sense_result_board] = op_score
+                outcome_scores.append(op_score)
+            sense_scores[square] = (
+                np.mean(outcome_scores) * self.sense_config.expected_outcome_coef +
+                np.min(outcome_scores) * self.sense_config.worst_outcome_coef +
+                np.std(outcome_scores) * self.sense_config.outcome_variance_coef
+            )
 
-    def sense_center_squares(self, sense_actions: List[Square]) -> Optional[Square]:
-        # Sense the center squares if no uncertain squares are available
-        center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
-        valid_center_squares = [square for square in sense_actions if square in center_squares]
-        if valid_center_squares:
-            return random.choice(valid_center_squares)
-        else:
-            return random.choice(sense_actions)
+        return max(sense_scores, key=sense_scores.get)
+
+    def evaluate_board(self, board_fen: str) -> float:
+        board = chess.Board(board_fen)
+        result = self.engine.analyse(board, chess.engine.Limit(depth=self.score_config.search_depth))
+        score = result["score"].white().score(mate_score=10000)
+        return score
 
     def handle_sense_result(self, sense_result: List[Tuple[Square, Optional[chess.Piece]]]):
-        # Update the possible states based on the sensing result
         self.possible_states = compare_state_window(self.possible_states, sense_result)
-        if sense_result:
-            self.sensing_history.append(sense_result[len(sense_result) // 2][0])  # Store the center square of the sensing result
 
     def choose_move(self, move_actions: List[chess.Move], seconds_left: float) -> Optional[chess.Move]:
-        num_states = len(self.possible_states)
-        if num_states > 2000:
-            self.possible_states = set(random.sample(self.possible_states, 2000))
-            num_states = 2000
+        if len(self.possible_states) == 1:
+            board = chess.Board(next(iter(self.possible_states)))
+            return self.engine.play(board, chess.engine.Limit(time=seconds_left)).move
 
-        # Use Stockfish to evaluate moves for each possible state
-        evaluated_moves = []
-        for fen in self.possible_states:
-            board = chess.Board(fen)
-            result = self.engine.play(board, chess.engine.Limit(time=min(seconds_left / 2, 5/num_states), depth=15))
-            if result.move in move_actions:
-                evaluated_moves.append((result.move, result.info["score"].relative.score(mate_score=10000)))
+        move_scores = defaultdict(RunningEst)
+        for board_fen in self.possible_states:
+            board = chess.Board(board_fen)
+            op_score = self.score_cache.get(board_fen, None)
+            if op_score is None:
+                op_score = self.evaluate_board(board_fen)
+                self.score_cache[board_fen] = op_score
+            for move in move_actions:
+                if move in board.legal_moves:
+                    board_copy = board.copy()
+                    board_copy.push(move)
+                    move_score = self.score_cache.get(board_copy.fen(), None)
+                    if move_score is None:
+                        move_score = self.evaluate_board(board_copy.fen())
+                        self.score_cache[board_copy.fen()] = move_score
+                    move_scores[move].update(move_score - op_score)
 
-        # Incorporate opponent move patterns and game phase
-        for move, score in evaluated_moves:
-            if move in self.opponent_moves:
-                score *= 0.8  # Penalize moves that the opponent has played before
-            if self.is_opening_phase():
-                if self.is_developing_move(move):
-                    score *= 1.2  # Encourage developing moves in the opening
-            elif self.is_endgame_phase():
-                if self.is_pawn_move(move):
-                    score *= 1.1  # Slightly favor pawn moves in the endgame
+        compound_score = {
+            move: (
+                    est.minimum * self.move_config.min_score_factor +
+                    est.maximum * self.move_config.max_score_factor +
+                    est.average * self.move_config.mean_score_factor
+            ) for move, est in move_scores.items()
+        }
 
-        # Choose the move with the highest average evaluation score
-        if evaluated_moves:
-            best_move = max(evaluated_moves, key=lambda x: x[1])[0]
-            return best_move
-        else:
-            # If no valid moves are found, return a random move from move_actions
-            return random.choice(move_actions)
+        highest_score = max(compound_score.values())
+        threshold_score = highest_score - self.move_config.threshold_score
+        move_options = [move for move, score in compound_score.items() if score >= threshold_score]
+        move_choice = random.choice(move_options)
 
-    def is_opening_phase(self) -> bool:
-        # Define your own criteria for the opening phase
-        return len(self.move_history) < 20
-
-    def is_endgame_phase(self) -> bool:
-        # Define your own criteria for the endgame phase
-        material_count = sum(c.pop_count() for fen in self.possible_states for c in chess.Board(fen).piece_maps().values())
-        return material_count < 12
-
-    def is_developing_move(self, move: chess.Move) -> bool:
-        # Define your own criteria for developing moves
-        piece = chess.Board().piece_at(move.from_square)
-        return piece is not None and (piece.piece_type == chess.KNIGHT or piece.piece_type == chess.BISHOP)
-
-    def is_pawn_move(self, move: chess.Move) -> bool:
-        piece = chess.Board().piece_at(move.from_square)
-        return piece is not None and piece.piece_type == chess.PAWN
+        return move_choice
 
     def handle_move_result(self, requested_move: Optional[chess.Move], taken_move: Optional[chess.Move],
         captured_opponent_piece: bool, capture_square: Optional[Square]):
-        # Update the possible states based on the move result
         if requested_move != taken_move:
             self.possible_states = [fen for fen in self.possible_states if chess.Board(fen).is_legal(taken_move)]
         
         if captured_opponent_piece:
             self.possible_states = [fen for fen in self.possible_states if chess.Board(fen).piece_at(capture_square) is None]
 
-        # Update the opponent's move history
-        if taken_move is not None:
-            self.opponent_moves.append(taken_move)
-            self.move_history.append(taken_move)
-
     def handle_game_end(self, winner_color: Optional[Color], win_reason: Optional[WinReason], game_history: GameHistory):
-        # Clean up the chess engine process at the end of the game
         self.engine.quit()
-
-
+        
 
 
 def make_move(fen_string, move_string):
@@ -236,4 +270,4 @@ def compare_state_window(fen_states, sense_result):
         if match:
             fen_results.append(fen_string)
     
-    return sorted(fen_results)
+    return sorted(fen_results) 
