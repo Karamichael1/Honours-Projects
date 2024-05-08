@@ -17,11 +17,13 @@ class ImprovedAgent(Player):
         self.sensing_history = []
 
     def handle_game_start(self, color: Color, board: chess.Board, opponent_name: str):
+        # Initialize the agent's state at the start of the game
         self.board = board
         self.color = color
         self.possible_states = {board.fen()}
 
     def handle_opponent_move_result(self, captured_my_piece: bool, capture_square: Optional[Square]):
+        # Update the possible states based on the opponent's move result
         if captured_my_piece:
             if capture_square is not None:
                 self.possible_states = {fen for fen in self.possible_states if chess.Board(fen).piece_at(capture_square) is not None}
@@ -38,6 +40,7 @@ class ImprovedAgent(Player):
             return self.sense_center_squares(sense_actions)
 
     def get_uncertain_squares(self) -> List[Square]:
+        # Identify squares where the piece occupancy is uncertain based on the possible states
         uncertain_squares = []
         for square in chess.SQUARES:
             piece_counts = Counter(board.piece_at(square) for board in [chess.Board(fen) for fen in self.possible_states])
@@ -76,6 +79,7 @@ class ImprovedAgent(Player):
         return info_gain
 
     def sense_center_squares(self, sense_actions: List[Square]) -> Optional[Square]:
+        # Sense the center squares if no uncertain squares are available
         center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
         valid_center_squares = [square for square in sense_actions if square in center_squares]
         if valid_center_squares:
@@ -84,6 +88,7 @@ class ImprovedAgent(Player):
             return random.choice(sense_actions)
 
     def handle_sense_result(self, sense_result: List[Tuple[Square, Optional[chess.Piece]]]):
+        # Update the possible states based on the sensing result
         self.possible_states = compare_state_window(self.possible_states, sense_result)
         if sense_result:
             self.sensing_history.append(sense_result[len(sense_result) // 2][0])  # Store the center square of the sensing result
@@ -141,6 +146,7 @@ class ImprovedAgent(Player):
 
     def handle_move_result(self, requested_move: Optional[chess.Move], taken_move: Optional[chess.Move],
         captured_opponent_piece: bool, capture_square: Optional[Square]):
+        # Update the possible states based on the move result
         if requested_move != taken_move:
             self.possible_states = [fen for fen in self.possible_states if chess.Board(fen).is_legal(taken_move)]
         
@@ -153,12 +159,14 @@ class ImprovedAgent(Player):
             self.move_history.append(taken_move)
 
     def handle_game_end(self, winner_color: Optional[Color], win_reason: Optional[WinReason], game_history: GameHistory):
+        # Clean up the chess engine process at the end of the game
         self.engine.quit()
 
 
 
 
 def make_move(fen_string, move_string):
+    # Apply a move to a FEN string and return the resulting FEN string
     board = chess.Board(fen_string)
     move = chess.Move.from_uci(move_string)
 
@@ -166,6 +174,7 @@ def make_move(fen_string, move_string):
     return board.fen()
 
 def generate_next_moves(fen_string):
+    # Generate all possible next moves from a FEN string
     board = chess.Board(fen_string)
     moves = []
     
@@ -182,6 +191,7 @@ def generate_next_moves(fen_string):
     return sorted(moves)
 
 def generate_next_moves_capture(fen_string, capture_square):
+    # Generate all possible next moves that capture a piece at the specified square
     board = chess.Board(fen_string)
     target_square = chess.parse_square(capture_square)
     capture_moves = []
@@ -194,6 +204,7 @@ def generate_next_moves_capture(fen_string, capture_square):
     return sorted(capture_moves)
 
 def generate_next_positions(fen_string, possible_moves):
+    # Generate all possible next positions from a FEN string and a list of possible moves
     fen_possibilites = []
     for possible_move in possible_moves:
         fen_possibilites.append(make_move(fen_string, possible_move))
@@ -201,6 +212,7 @@ def generate_next_positions(fen_string, possible_moves):
     return sorted(fen_possibilites)
 
 def compare_state_window(fen_states, sense_result):
+    # Filter out FEN states that are inconsistent with the sensing result
     fen_results = []
     for fen_string in fen_states:
         board = chess.Board(fen_string)
@@ -224,4 +236,4 @@ def compare_state_window(fen_states, sense_result):
         if match:
             fen_results.append(fen_string)
     
-    return sorted(fen_results) 
+    return sorted(fen_results)
