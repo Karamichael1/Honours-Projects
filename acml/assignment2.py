@@ -1,21 +1,22 @@
 import math
 
 
-data = [
+dataset = [
     [0.22, 0.33], [0.45, 0.76], [0.73, 0.39], [0.25, 0.35], [0.51, 0.69],
     [0.69, 0.42], [0.41, 0.49], [0.15, 0.29], [0.81, 0.32], [0.50, 0.88],
     [0.23, 0.31], [0.77, 0.30], [0.56, 0.75], [0.11, 0.38], [0.81, 0.33],
     [0.59, 0.77], [0.10, 0.89], [0.55, 0.09], [0.75, 0.35], [0.44, 0.55]
 ]
 
-def euclidean_distance(point1, point2):
-    return math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
+def euclidean_distance(x, y):
+    ans=math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2)
+    return ans
 
-def k_means(data, initial_centroids):
+def k_means(dataset, initial_centroids):
     centroids = initial_centroids
     while True:
         clusters = [[] for _ in range(len(centroids))]
-        for point in data:
+        for point in dataset:
             distances = [euclidean_distance(point, centroid) for centroid in centroids]
             cluster_index = distances.index(min(distances))
             clusters[cluster_index].append(point)
@@ -49,7 +50,7 @@ for _ in range(3):
     y = float(input())
     initial_centroids.append([x, y])
 
-final_centroids, clusters = k_means(data, initial_centroids)
+final_centroids, clusters = k_means(dataset, initial_centroids)
 
 
 error = sum_of_squares_error(clusters, final_centroids)
