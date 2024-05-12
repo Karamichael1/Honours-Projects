@@ -10,7 +10,7 @@ class ImprovedAgent(Player):
         self.board = None
         self.color = None
         self.piece_captured = None
-        self.engine = chess.engine.SimpleEngine.popen_uci('/home/aidan/Ubuntu/AI/Project/Honours-Projects/ai/labs/Project/stockfish/stockfish.exe', setpgrp=True)
+        self.engine = chess.engine.SimpleEngine.popen_uci('stockfish/stockfish.exe', setpgrp=True)
 
     def handle_game_start(self, color: Color, board: chess.Board, opponent_name: str):
         self.board = board
@@ -77,7 +77,7 @@ class ImprovedAgent(Player):
             self.board.push(taken_move)
 
     def handle_game_end(self, winner_color: Optional[Color], win_reason: Optional[WinReason],
-         game_history: GameHistory):
+        game_history: GameHistory):
         try:
             # if the engine is already terminated then this call will throw an exception
             self.engine.quit()
