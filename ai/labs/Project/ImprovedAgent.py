@@ -37,11 +37,61 @@ class ImprovedAgent(Player):
         if enemy_king_square:
             return enemy_king_square
     
-        # otherwise, just randomly choose a sense action, but don't sense on a square where our pieces are located]
+        num_pieces = len(self.board.piece_map())
+        if num_pieces > 32:
+            game_phase = "opening"
+        elif num_pieces > 16:
+            game_phase = "middlegame"
+        else:
+            game_phase = "endgame"
+
+        # prioritize sensing based on the game phase
+        if game_phase == "opening":
+            # focus on sensing central squares and key positions
+            central_squares = [
+                chess.D4, chess.E4, chess.D5, chess.E5,
+                chess.C4, chess.F4, chess.C5, chess.F5,
+                chess.C3, chess.D3, chess.E3, chess.F3,
+                chess.C6, chess.D6, chess.E6, chess.F6
+            ]
+            for square in central_squares:
+                if square in sense_actions:
+                    return square
+
+        elif game_phase == "middlegame":
+            # focus on sensing squares critical for control, defense, and attack
+            important_squares = []
+            for square in sense_actions:
+                if self.board.is_attacked_by(not self.color, square):
+                    important_squares.append(square)
+                elif self.board.attackers(self.color, square):
+                    important_squares.append(square)
+            if important_squares:
+                return random.choice(important_squares)
+
+        else:  # endgame
+            # prioritize sensing squares crucial for the endgame position
+            enemy_king_square = self.board.king(not self.color)
+            if enemy_king_square:
+                return enemy_king_square
+
+            pawn_squares = []
+            for square in sense_actions:
+                piece = self.board.piece_at(square)
+                if piece and piece.piece_type == chess.PAWN:
+                    pawn_squares.append(square)
+            if pawn_squares:
+                return random.choice(pawn_squares)
+
+        # if no specific strategy applies, randomly choose a sense action
+        # but don't sense on a square where our pieces are located
         for square, piece in self.board.piece_map().items():
             if piece.color == self.color:
                 sense_actions.remove(square)
-        return random.choice(sense_actions)
+        if sense_actions:
+            return random.choice(sense_actions)
+
+        return None
 
     def handle_sense_result(self, sense_result: List[Tuple[Square, Optional[chess.Piece]]]):
         # add the pieces in the sense result to our board
@@ -64,9 +114,9 @@ class ImprovedAgent(Player):
             result = self.engine.play(self.board, chess.engine.Limit(time=0.5))
             return result.move
         except chess.engine.EngineTerminatedError:
-            print('Stockfish Engine died')
+            None
         except chess.engine.EngineError:
-            print('Stockfish Engine bad state at "{}"'.format(self.board.fen()))
+            None
         # if all else fails, pass
         return None
 

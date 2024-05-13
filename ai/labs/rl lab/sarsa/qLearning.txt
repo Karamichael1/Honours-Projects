@@ -1,0 +1,10 @@
+Q-learning directly estimates the optimal Q-values. 
+So it is drawn to the high reward shortest path along the cliff. 
+But this also causes it to frequently fall off the cliff, resulting in large negative returns.
+This leads to the unstable learning.
+SARSA's policy is more cautious.
+By following the current policy in its updates,
+it settles on the longer but safer path more consistently. 
+This results in lower but more stable returns across episodes.
+This is evident towards the end of the graph where you see the variance difference between SARSAs and Q learnings returns.
+Q learning has a higher variance and it seeks to constantly seeks to maximise its reward as its an off policy method whereas SARSA has a lower variance as it is an on policy method.
