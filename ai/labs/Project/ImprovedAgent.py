@@ -3,7 +3,20 @@ import chess.engine
 import random
 from reconchess import Player, Color, GameHistory, WinReason, Square
 from typing import List, Tuple, Optional
+# move sequences from white's perspective, flipped at runtime if playing as black
+QUICK_ATTACKS = [
+    # four move mates
+    [chess.Move(chess.E2, chess.E4), chess.Move(chess.F1, chess.C4), chess.Move(chess.D1, chess.H5), chess.Move(
+        chess.C4, chess.F7), chess.Move(chess.F7, chess.E8), chess.Move(chess.H5, chess.E8)],
+]
 
+
+def flipped_move(move):
+    def flipped(square):
+        return chess.square(chess.square_file(square), 7 - chess.square_rank(square))
+
+    return chess.Move(from_square=flipped(move.from_square), to_square=flipped(move.to_square),
+                      promotion=move.promotion, drop=move.drop)
 
 class ImprovedAgent(Player):
     def __init__(self):
@@ -15,6 +28,8 @@ class ImprovedAgent(Player):
     def handle_game_start(self, color: Color, board: chess.Board, opponent_name: str):
         self.board = board
         self.color = color
+        if color == chess.BLACK:
+            self.move_sequence = list(map(flipped_move, self.move_sequence))
 
     def handle_opponent_move_result(self, captured_my_piece: bool, capture_square: Optional[Square]):        
         # if the opponent captured our piece, remove it from our board.
@@ -99,6 +114,10 @@ class ImprovedAgent(Player):
             self.board.set_piece_at(square, piece)
 
     def choose_move(self, move_actions: List[chess.Move], seconds_left: float) -> Optional[chess.Move]:
+        while len(self.move_sequence) > 0 and self.move_sequence[0] not in move_actions:
+            self.move_sequence.pop(0)
+        if len(self.move_sequence) > 0:
+            return self.move_sequence.pop(0)
         # if we might be able to take the king, try to
         enemy_king_square = self.board.king(not self.color)
         if enemy_king_square:
@@ -121,7 +140,7 @@ class ImprovedAgent(Player):
         return None
 
     def handle_move_result(self, requested_move: Optional[chess.Move], taken_move: Optional[chess.Move],
-                            captured_opponent_piece: bool, capture_square: Optional[Square]):
+        captured_opponent_piece: bool, capture_square: Optional[Square]):
         # if a move was executed, apply it to our board
         if taken_move is not None:
             self.board.push(taken_move)
