@@ -1,0 +1,3 @@
+Why i chose PRM is beacuase PRM is probabilistically complete, meaning that as the number of samples approaches infinity, the probability of finding a solution (if one exists) approaches one. RRT, on the other hand, 
+is only probabilistically complete under certain conditions and may struggle to find solutions in narrow passages or highly constrained environments.Therefore since I wanted the most complete algorithm with all sorts of environments I went with the PRM over the RTT.
+Also in addition PRM tends to generate a smoother path compared to RTT which lack the sharp turns normally found in RTT
