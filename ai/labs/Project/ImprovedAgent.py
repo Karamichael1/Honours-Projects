@@ -9,29 +9,27 @@ import matplotlib.pyplot as plt
 
 class ImprovedAgent(Player):
     
-    # DONE
     def __init__(self):
         self.board = None
         self.color = None
-        self.num_randoms = 0
         self.possible_boards = set()
         self.non_edge_squares = []
         self.engine = chess.engine.SimpleEngine.popen_uci('stockfish/stockfish.exe', setpgrp=True, timeout = 30)
-
         self.sensed_squares = set()
         self.last_sensed_turn = {square: 0 for square in range(64)}
         self.my_piece_captured_square = None
         self.turn = 0
 
-    # DONE
     def handle_game_start(self, color: Color, board: chess.Board, opponent_name: str):
         # initialize the agent's state at the start of the game
         self.board = board
         self.color = color
+        # gets the non edge squares
         for square in range(64):
             if square // 8 != 0 and square // 8 != 7:
                 if square % 8 != 0 and square % 8 != 7:
                     self.non_edge_squares.append(square)
+        # records the intial board
         self.possible_boards.add(self.board.fen())
 
     def handle_opponent_move_result(self, captured_my_piece: bool, capture_square: Optional[Square]):
@@ -40,30 +38,37 @@ class ImprovedAgent(Player):
         if (self.color and chess.STARTING_FEN==self.board.fen()):
             return
         
+        # keep track of board (trout bot method)
         if captured_my_piece:
             self.board.remove_piece_at(capture_square)
         
-        new_possible_boards = set() 
+        # record captrue square
         self.my_piece_captured_square = capture_square
+
+        new_possible_boards = set() 
 
         # for each possible board
         for fen in self.possible_boards:
             board = chess.Board(fen)
 
+            # get all possible moves
             moves = generate_next_moves(board)
-            # find all possible moves that could have led to the capture
             for move in moves:
-                if capture_square is not None and move.to_square == capture_square:
-                    board.push(move)
-                    new_possible_boards.add(board.fen())
-                    board.pop()   
-                elif capture_square is None:
-                    board.push(move)
-                    new_possible_boards.add(board.fen())
-                    board.pop()  
+                if move in board.pseudo_legal_moves:
+                    # if there is a capture
+                    if capture_square is not None and move.to_square is not None and move.to_square == capture_square:
+                        board.push(move)
+                        new_possible_boards.add(board.fen())
+                        board.pop()   
+                    # if there is no capture
+                    elif capture_square is None:
+                        board.push(move)
+                        new_possible_boards.add(board.fen())
+                        board.pop()  
 
+        # use single board as fail safe
         if len(new_possible_boards) == 0:
-            new_possible_boards.add(self.board)
+            new_possible_boards.add(self.board.fen())
 
         self.possible_boards = new_possible_boards
 
@@ -88,7 +93,7 @@ class ImprovedAgent(Player):
             row = self.my_piece_captured_square // 8
             col = self.my_piece_captured_square % 8
             if row == 0 or row == 7 or col == 0 or col == 7:
-                # If on the edge, find a square adjacent or one square away
+                # If on the edge, find a square adjacent or one square away (non edge square)
                 for square in sense_actions:
                     square_row = square // 8
                     square_col = square % 8
@@ -99,10 +104,13 @@ class ImprovedAgent(Player):
             else:
                 return self.my_piece_captured_square
         
+        # use entropy to sense board
         sense_action = self.adapted_entropy(self.possible_boards, not self.color)
+        
         return sense_action
 
     def adapted_entropy(self, possible_boards, player):
+
         # Cache board objects for each FEN
         board_cache = {fen: chess.Board(fen) for fen in possible_boards}
 
@@ -155,24 +163,23 @@ class ImprovedAgent(Player):
             chess.BISHOP: 3,
             chess.ROOK: 5,
             chess.QUEEN: 9,
-            chess.KING: 100 # We don't want to capture the king
+            chess.KING: 100
         }
         return values.get(piece_type, 0)
 
-    # DONE
     def handle_sense_result(self, sense_result: List[Tuple[Square, Optional[chess.Piece]]]):
         
         new_possible_boards = set()
 
+        # update backup board
         for square, piece in sense_result:
             self.board.set_piece_at(square, piece)
-
 
         # for each possible board
         for fen in self.possible_boards:
             match = True
             board = chess.Board(fen)
-
+                                        
             # for each window piece
             for window_position, window_piece in sense_result:
                                     
@@ -201,28 +208,26 @@ class ImprovedAgent(Player):
         
         self.possible_boards = new_possible_boards
 
-    # TEMP DONE
     def choose_move(self, move_actions: List[chess.Move], seconds_left: float) -> Optional[chess.Move]:
         
-        # if there are no more boards
+        # if there are no more boards return a random move
         if len(self.possible_boards) == 0:
             move = random.choice(move_actions)
-            if self.num_randoms == 0:
-                self.num_randoms = 1
-
             return move
 
+        # if there are more than 10000 boards, randomly sample 10000 but keep the rest in memmory
         if len(self.possible_boards) > 10000:
             possible_boards = set(random.sample(self.possible_boards, 10000))
         else:
             possible_boards = self.possible_boards.copy()
 
         possible_moves = []
+
         # for each possible board
         for fen in possible_boards:
-        # for fen in self.possible_boards:
-
             board = chess.Board(fen)
+            
+            # attempt to capture the king
             king_square = board.king(not self.color)
             attackers_on_king_square = board.attackers(self.color, king_square)
 
@@ -233,8 +238,9 @@ class ImprovedAgent(Player):
                 if final_move in move_actions:
                     possible_moves.append(final_move.uci())
 
-            # if the king is not attacked
+            # cant capture the king
             else:
+                # get best move from stockfish
                 try:
                     board.turn = self.color
                     board.clear_stack()
@@ -248,23 +254,21 @@ class ImprovedAgent(Player):
                 except chess.IllegalMoveError:
                     possible_moves.append(random.choice(move_actions).uci())
 
-        # if there are no possible moves
+        # if there are no possible moves do a random move
         if not possible_moves:
             move = random.choice(move_actions)
             return move
         
-        # get the most occuring move
+        # get the most popular move
         move_counts = Counter(sorted(possible_moves))
         move = max(move_counts, key=move_counts.get)
 
         return chess.Move.from_uci(move)
     
-    # OPTIMIZE - done i think
-    def handle_move_result(self, requested_move: Optional[chess.Move], taken_move: Optional[chess.Move],
-        captured_opponent_piece: bool, capture_square: Optional[Square]):
-        # # Update the possible states based on the move result
+    def handle_move_result(self, requested_move: Optional[chess.Move], taken_move: Optional[chess.Move], captured_opponent_piece: bool, capture_square: Optional[Square]):
 
         new_possible_boards = set()
+
         #  updating so 1st turn works
         if (self.color and chess.STARTING_FEN==self.board.fen()):
             self.board.push(taken_move)
@@ -276,7 +280,7 @@ class ImprovedAgent(Player):
 
                 moves = generate_next_moves(board)                
                 # Check if the taken move is pseudo-legal
-                if taken_move in moves:
+                if taken_move in moves and taken_move in board.pseudo_legal_moves:
                     board.push(taken_move)
                     new_possible_boards.add(board.fen())
                     board.pop()
@@ -295,14 +299,10 @@ class ImprovedAgent(Player):
                     moves = generate_next_moves(board)                
 
                     if requested_move not in moves:
-                        board.push(requested_move)
                         new_possible_boards.add(board.fen())
-                        board.pop()
 
         self.possible_boards = new_possible_boards
 
-
-    # DONE 
     def handle_game_end(self, winner_color: Optional[Color], win_reason: Optional[WinReason], game_history: GameHistory):
         # Clean up the chess engine process at the end of the game
         self.engine.quit()
