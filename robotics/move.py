@@ -3,17 +3,11 @@
 import sys
 import rospy
 import numpy as np
+import math
 from std_msgs.msg import Empty
 from geometry_msgs.msg import Twist
 from gazebo_msgs.srv import GetModelState
 from tf.transformations import euler_from_quaternion
-
-def stop():
-    rospy.loginfo("Stopping...")
-    cmd_vel_pub = rospy.Publisher('/mobile_base/commands/velocity', Twist, queue_size=10)
-    twist = Twist()
-    cmd_vel_pub.publish(twist)
-    rospy.sleep(1)
 
 def move_to_goal(U, R):
     rospy.loginfo("Moving to goal...")
@@ -67,28 +61,28 @@ def get_orientation():
 def calculate_yaw(goal, current_pos):
     return np.arctan2(goal[1] - current_pos[1], goal[0] - current_pos[0])
 
-def face_goal(goal_ori):
+def face_goal(goal_ori, Kp_ori):
     while True:
         current_ori = get_orientation()
         error_ori = goal_ori - current_ori
 
+        if (np.linalg.norm(error_ori) > np.pi):
+            error_ori =  (error_ori - 2*np.pi*math.copysign(1, error_ori))
+        rospy.loginfo(error_ori)
         # Control inputs for orientation
         R = Kp_ori * error_ori
 
         static_rotate(R)
 
-        if (np.linalg.norm(error_ori) < 0.01):
-            stop()
+        if (np.linalg.norm(error_ori) < 0.03):
             break
 
-if __name__ == '__main__':
+def move_to_prop(goal):
     try:
         rospy.init_node('turtle_controller', anonymous=True)
-        rate = rospy.Rate(10)  # 10 Hz
 
-        goal = extract_goal_coords()
         # position control constants
-        Kp = 0.2
+        Kp = 0.5
         Kp_ori = 0.5
 
         while True:
@@ -98,10 +92,11 @@ if __name__ == '__main__':
 
             current_ori = get_orientation()
             error_ori = goal_ori - current_ori
+            if (np.linalg.norm(error_ori) > np.pi):
+                error_ori =  (error_ori - 2*np.pi*math.copysign(1, error_ori))
 
             if (np.linalg.norm(error_ori) > 0.1):
-                face_goal(goal_ori)
-                stop()
+                face_goal(goal_ori, Kp_ori)
 
             current_pos = get_coordinates()
             error = np.absolute(goal - current_pos)
@@ -109,16 +104,20 @@ if __name__ == '__main__':
 
             current_ori = get_orientation()
             error_ori = goal_ori - current_ori
-            
-            U = Kp * error 
+            if (np.linalg.norm(error_ori) > np.pi):
+                error_ori =  (error_ori - 2*np.pi*math.copysign(1, error_ori))
 
+            if (np.linalg.norm(error) < 1):
+                U = Kp * np.array([math.copysign(1, error[0])*math.sqrt(np.abs(error[0]))])
+            else:
+                U = Kp * error 
+            
             # Control inputs for orientation
             R = Kp_ori * error_ori
 
             move_to_goal(U, R)
 
             if (np.linalg.norm(error) < 0.05):
-                stop()
                 break
 
         rospy.loginfo("Script completed.")
