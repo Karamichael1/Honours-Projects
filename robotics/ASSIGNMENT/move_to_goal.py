@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import PRM
+import robotics.ASSIGNMENT.PRM as PRM
 import move
 import sys
 import numpy as np
